@@ -1,12 +1,11 @@
+# visualizer.py
+
 import pygame
 import math
 import random
 import colorsys
 import os
 import time
-import librosa
-import numpy as np
-import sounddevice as sd
 
 
 class Particle:
@@ -34,15 +33,20 @@ class Particle:
 class Visualizer:
     """
     Modes:
-        0 → Particle Burst
-        1 → Spectrum Bars (mirrored)
-        2 → Mandala (rotating geometry)
-        3 → Waveform Ribbon
-        4 → Nebula (radial glow)
+        0 -> Particle Burst
+        1 -> Spectrum Bars
+        2 -> Mandala
+        3 -> Waveform Ribbon
+        4 -> Nebula
     """
 
-    MODE_NAMES = ["Particle Burst", "Spectrum Bars",
-                  "Mandala", "Waveform Ribbon", "Nebula"]
+    MODE_NAMES = [
+        "Particle Burst",
+        "Spectrum Bars",
+        "Mandala",
+        "Waveform Ribbon",
+        "Nebula"
+    ]
 
     def __init__(self, width=1000, height=700):
         pygame.init()
@@ -90,6 +94,7 @@ class Visualizer:
         if beat:
             self.beat_flash = 1.0
             self._spawn_beat_particles()
+
         self.beat_flash *= 0.9
 
     def switch_mode(self, mode=None):
@@ -123,6 +128,7 @@ class Visualizer:
             self.screen.blit(flash, (0, 0))
 
         color = self._hue_color(self.hue)
+
         if self.mode == 0:
             self._draw_particles(color)
         elif self.mode == 1:
@@ -148,6 +154,7 @@ class Visualizer:
     def _spawn_beat_particles(self):
         cx, cy = self.width // 2, self.height // 2
         count = int(30 + self.amplitude * 80)
+
         for _ in range(count):
             angle = random.uniform(0, math.tau)
             speed = random.uniform(2, 8) * (1 + self.amplitude)
@@ -158,6 +165,7 @@ class Visualizer:
             hue = (self.hue + random.uniform(-0.1, 0.1)) % 1.0
             color = self._hue_color(hue)
             self.particles.append(Particle(cx, cy, vx, vy, life, size, color))
+
         if len(self.particles) > 800:
             self.particles = self.particles[-800:]
 
@@ -167,10 +175,16 @@ class Visualizer:
             for _ in range(int(self.amplitude * 6)):
                 a = random.uniform(0, math.tau)
                 s = random.uniform(1, 4)
-                self.particles.append(Particle(
-                    cx, cy, math.cos(a) * s, math.sin(a) * s,
-                    random.randint(30, 60), random.randint(2, 4), color
-                ))
+                self.particles.append(
+                    Particle(
+                        cx, cy,
+                        math.cos(a) * s,
+                        math.sin(a) * s,
+                        random.randint(30, 60),
+                        random.randint(2, 4),
+                        color
+                    )
+                )
 
         new_particles = []
         for p in self.particles:
@@ -180,42 +194,46 @@ class Visualizer:
                 r = int(p.color[0] * alpha_ratio)
                 g = int(p.color[1] * alpha_ratio)
                 b = int(p.color[2] * alpha_ratio)
-                pygame.draw.circle(self.screen, (r, g, b),
-                                   (int(p.x), int(p.y)), p.size)
+                pygame.draw.circle(self.screen, (r, g, b), (int(p.x), int(p.y)), p.size)
                 new_particles.append(p)
+
         self.particles = new_particles
 
     def _draw_spectrum_bars(self, color):
         n = len(self.spectrum)
         if n == 0:
             return
+
         bar_w = self.width / n
         cy = self.height // 2
+
         for i, val in enumerate(self.spectrum):
             h = int(val * self.height * 0.45)
             x = int(i * bar_w)
             hue = (self.hue + i / n * 0.3) % 1.0
             c = self._hue_color(hue)
-            pygame.draw.rect(self.screen, c,
-                             (x + 2, cy - h, max(1, int(bar_w - 4)), h))
-            pygame.draw.rect(self.screen, c,
-                             (x + 2, cy, max(1, int(bar_w - 4)), h))
+
+            pygame.draw.rect(self.screen, c, (x + 2, cy - h, max(1, int(bar_w - 4)), h))
+            pygame.draw.rect(self.screen, c, (x + 2, cy, max(1, int(bar_w - 4)), h))
 
     def _draw_mandala(self, color):
         cx, cy = self.width // 2, self.height // 2
         layers = 6
         spikes = 12
         base_r = 50 + self.amplitude * 200
+
         for L in range(layers):
             r_outer = base_r + L * 25
             r_inner = r_outer * 0.5
             pts = []
+
             for i in range(spikes * 2):
                 rr = r_outer if i % 2 == 0 else r_inner
                 theta = self.angle * (1 + L * 0.2) + i * math.pi / spikes
                 x = cx + rr * math.cos(theta)
                 y = cy + rr * math.sin(theta)
                 pts.append((x, y))
+
             hue = (self.hue + L * 0.08) % 1.0
             c = self._hue_color(hue)
             pygame.draw.polygon(self.screen, c, pts, width=2)
@@ -223,13 +241,16 @@ class Visualizer:
     def _draw_waveform_ribbon(self, color):
         if len(self.waveform_history) < 2:
             return
+
         cy = self.height // 2
         pts_top, pts_bot = [], []
+
         for i, v in enumerate(self.waveform_history):
             x = i * (self.width / max(1, len(self.waveform_history)))
             offset = v * self.height * 0.4
             pts_top.append((x, cy - offset))
             pts_bot.append((x, cy + offset))
+
         if len(pts_top) >= 2:
             pygame.draw.lines(self.screen, color, False, pts_top, 3)
             pygame.draw.lines(self.screen, color, False, pts_bot, 3)
@@ -238,6 +259,7 @@ class Visualizer:
         cx, cy = self.width // 2, self.height // 2
         max_r = int(80 + self.amplitude * 350)
         layers = 25
+
         for i in range(layers, 0, -1):
             r = int(max_r * i / layers)
             ratio = i / layers
@@ -246,8 +268,7 @@ class Visualizer:
             surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
             alpha = int(30 * (1 - ratio) + 10)
             pygame.draw.circle(surf, (*c, alpha), (r, r), r)
-            self.screen.blit(surf, (cx - r, cy - r),
-                             special_flags=pygame.BLEND_RGBA_ADD)
+            self.screen.blit(surf, (cx - r, cy - r), special_flags=pygame.BLEND_RGBA_ADD)
 
     def _draw_hud(self):
         mode_text = f"Mode {self.mode + 1}/5: {self.MODE_NAMES[self.mode]}"
@@ -256,7 +277,9 @@ class Visualizer:
 
         hint = self.small_font.render(
             "SPACE: next  |  1-5: select  |  F: fullscreen  |  S: screenshot  |  ESC: quit",
-            True, (180, 180, 200))
+            True,
+            (180, 180, 200)
+        )
         self.screen.blit(hint, (15, self.height - 22))
 
         if self.beat_flash > 0.3:
@@ -273,65 +296,3 @@ class Visualizer:
         path = f"screenshots/art_{int(time.time())}.png"
         pygame.image.save(self.screen, path)
         print(f"Saved: {path}")
-
-
-# ─────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────
-if __name__ == "__main__":
-
-    AUDIO_FILE = r"C:\Users\T.B\Desktop\proj dsp\cleaned_Feynman.wav"
-    HOP = 512
-
-    print("Loading audio...")
-    y, sr = librosa.load(AUDIO_FILE, sr=None)
-
-    stft = librosa.stft(y, hop_length=HOP)
-    mag = np.abs(stft)
-
-    rms = librosa.feature.rms(y=y, hop_length=HOP)[0]
-    amp = rms / (rms.max() + 1e-9)
-
-    freq_idx = np.argmax(mag, axis=0)
-    freqs = librosa.fft_frequencies(sr=sr)
-    freq = freqs[freq_idx]
-
-    rolling = np.convolve(amp, np.ones(20) / 20, mode='same')
-    beats = amp > rolling * 1.5
-
-    bands = np.array([
-        mag[i:i+10].mean(axis=0)
-        for i in range(0, mag.shape[0], 10)
-    ]).T
-    bands = bands[:, :32]
-    bands /= bands.max() + 1e-9
-
-    # ── Audio sync variables ──
-    SECONDS_PER_FRAME = HOP / sr
-    elapsed = 0.0
-    frame = 0
-
-    # ── Play audio in background ──
-    sd.play(y, sr)
-
-    vis = Visualizer()
-
-    while vis.running and frame < len(amp):
-        dt = vis.clock.get_time() / 1000.0
-        elapsed += dt
-        steps = int(elapsed / SECONDS_PER_FRAME)
-        if steps:
-            frame = min(frame + steps, len(amp) - 1)
-            elapsed -= steps * SECONDS_PER_FRAME
-
-        vis.update(
-            float(amp[frame]),
-            float(freq[frame]),
-            bands[frame].tolist(),
-            bool(beats[frame])
-        )
-        vis.draw()
-
-    sd.stop()
-    vis.quit()
-    print("Done.")
